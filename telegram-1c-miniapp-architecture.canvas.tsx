@@ -22,9 +22,9 @@ import {
 const FLOW_NODES = [
   { id: "user", label: "Пользователь", sub: "Telegram" },
   { id: "bot", label: "Бот", sub: "только телефон" },
-  { id: "api", label: "Backend", sub: "реестр + secrets" },
-  { id: "mini", label: "Mini App", sub: "базы · OData · UI" },
-  { id: "odata", label: "1С OData", sub: "через Backend" },
+  { id: "api", label: "Backend", sub: "ACL + OData" },
+  { id: "mini", label: "Mini App", sub: "базы · ACL · UI" },
+  { id: "odata", label: "1С OData", sub: "единый логин" },
 ];
 
 const FLOW_EDGES = [
@@ -130,19 +130,19 @@ export default function Telegram1cMiniappArchitecture() {
       <Stack gap={8}>
         <H1>Telegram Mini App + 1С OData</H1>
         <Text tone="secondary">
-          Архитектура зафиксирована: self-service в Mini App, OData на каждую базу,
-          повторный логин при смене пароля.
+          ACL по телефонам, единый OData-логин на базу (только owner), хостинг
+          melnichuk.kz / CT200.
         </Text>
       </Stack>
 
       <Callout tone="success">
-        Ключевые решения закрыты — можно идти в ТЗ / скелет репозитория.
+        Решения закрыты, включая шаринг: только ACL, credentials только у владельца.
       </Callout>
 
       <Grid columns={3} gap={12}>
-        <Stat value="Self-service" label="user сам заводит базы" />
-        <Stat value="Per-base" label="OData на каждую базу" />
-        <Stat value="Re-auth" label="если пароль 1С сменили" />
+        <Stat value="ACL" label="доступ по телефону" />
+        <Stat value="1 login" label="OData на базу" />
+        <Stat value="Owner" label="меняет вход и ACL" />
       </Grid>
 
       <Stack gap={8}>
@@ -150,32 +150,18 @@ export default function Telegram1cMiniappArchitecture() {
         <Table
           headers={["Вопрос", "Решение"]}
           rows={[
-            [
-              "Номер сверяется с чем",
-              "Свой бэкенд (реестр у нас)",
-            ],
-            [
-              "OData логин/пароль",
-              "На бэкенде; один раз после успешной проверки к 1С",
-            ],
-            [
-              "Бот vs Mini App",
-              "Бот = только телефон; весь UI — Mini App",
-            ],
-            [
-              "Кто заводит user / базы",
-              "Сам пользователь в Mini App (self-service)",
-            ],
-            [
-              "OData-учётка",
-              "На каждую базу отдельно (user × base)",
-            ],
-            [
-              "Пароль 1С сменили",
-              "Форма повторного входа в Mini App + обновление секрета",
-            ],
+            ["Телефон", "Свой бэкенд"],
+            ["OData", "Один логин на базу; хранит backend; пишет только owner"],
+            ["Бот", "Только телефон → Mini App"],
+            ["Базы", "Self-service в Mini App"],
+            ["Шаринг", "ACL: owner добавляет телефоны"],
+            ["Гость", "Видит базу и работает; не меняет вход/ACL"],
+            ["Re-auth", "Только owner при смене пароля 1С"],
+            ["Хостинг", "CT200 + Cloudflare + *.melnichuk.kz"],
           ]}
           rowTone={[
+            "success",
+            "success",
             "success",
             "success",
             "success",
@@ -192,112 +178,57 @@ export default function Telegram1cMiniappArchitecture() {
           <CardBody>
             <FlowDiagram />
             <Text size="small" tone="tertiary" style={{ marginTop: 8 }}>
-              Пунктир: Mini App ↔ Backend. В 1С OData ходит только сервер.
+              OData всегда учёткой владельца базы. ACL только открывает UI/прокси.
             </Text>
           </CardBody>
         </Card>
       </Stack>
 
       <Stack gap={8}>
-        <H2>Сценарий пользователя</H2>
+        <H2>ACL</H2>
         <Table
-          headers={["Шаг", "Где", "Что происходит"]}
+          headers={["Кто", "Может"]}
           rows={[
-            ["1", "Бот", "Отправить номер → Backend создаёт/находит user по телефону"],
-            ["2", "Бот", "Кнопка «Открыть приложение»"],
-            [
-              "3",
-              "Mini App",
-              "Добавить базу: URL OData + логин/пароль → проверка → сохранить",
-            ],
-            [
-              "4",
-              "Mini App",
-              "Список своих баз → работа (фонды и т.д.) через Backend → OData",
-            ],
-            [
-              "5",
-              "Mini App",
-              "401/ошибка auth от 1С → форма повторного входа → обновить credentials",
-            ],
+            ["Owner", "Создать базу, credentials, ACL, re-auth, работа"],
+            ["Телефон в ACL", "Видеть базу, работать через прокси"],
+            ["Чужой номер", "Базы не видит"],
           ]}
         />
+        <Text size="small" tone="secondary">
+          Список баз = где я owner ∪ куда добавлен мой телефон.
+        </Text>
       </Stack>
-
-      <H2>Компоненты</H2>
-      <Grid columns={2} gap={12}>
-        <Card>
-          <CardHeader trailing={<Pill tone="info">тонкий</Pill>}>
-            Telegram Bot
-          </CardHeader>
-          <CardBody>
-            <Stack gap={6}>
-              <Text size="small">Только запрос телефона</Text>
-              <Text size="small">WebApp-кнопка в Mini App</Text>
-              <Text size="small" tone="tertiary">
-                Без меню и бизнес-сценариев в чате
-              </Text>
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader trailing={<Pill tone="success">ядро</Pill>}>
-            Backend API
-          </CardHeader>
-          <CardBody>
-            <Stack gap={6}>
-              <Text size="small">User по телефону + Telegram id</Text>
-              <Text size="small">Базы и credentials: user × base, шифрование</Text>
-              <Text size="small">Прокси OData; при 401 — сигнал re-auth в Mini App</Text>
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader trailing={<Pill tone="info">весь UI</Pill>}>
-            Mini App
-          </CardHeader>
-          <CardBody>
-            <Stack gap={6}>
-              <Text size="small">CRUD своих баз + форма OData-логина</Text>
-              <Text size="small">Повторный вход при смене пароля 1С</Text>
-              <Text size="small">Фонды и остальные сценарии</Text>
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>1С OData</CardHeader>
-          <CardBody>
-            <Stack gap={6}>
-              <Text size="small">Проверка учётки при add/re-auth базы</Text>
-              <Text size="small">Запросы — credentials этой базы</Text>
-              <Text size="small" tone="tertiary">
-                Права на данные — на стороне 1С
-              </Text>
-            </Stack>
-          </CardBody>
-        </Card>
-      </Grid>
 
       <Stack gap={8}>
-        <H2>Модель данных (контур)</H2>
+        <H2>Сценарий</H2>
         <Table
-          headers={["Сущность", "Ключ", "Поля / смысл"]}
+          headers={["Шаг", "Где", "Что"]}
           rows={[
-            ["User", "phone, telegram_id", "Создаётся при первом share contact"],
-            [
-              "BaseConnection",
-              "user_id + base_id",
-              "name, odata_url; принадлежит пользователю",
-            ],
-            [
-              "ODataCredential",
-              "user_id + base_id",
-              "login + password (encrypted); 1:1 с базой",
-            ],
-            ["Session", "user", "Telegram initData → наш токен"],
+            ["1", "Бот", "Номер → user в backend"],
+            ["2", "Бот", "Открыть Mini App"],
+            ["3", "Mini App", "Owner: база + OData → проверка → save"],
+            ["4", "Mini App", "Owner: добавить телефоны в ACL"],
+            ["5", "Mini App", "Гость с ACL: база в списке → фонды"],
+            ["6", "Mini App", "Owner: 401 → re-auth OData"],
           ]}
         />
       </Stack>
+
+      <H2>Модель данных</H2>
+      <Table
+        headers={["Сущность", "Ключ", "Смысл"]}
+        rows={[
+          ["User", "phone, telegram_id", "После share contact"],
+          ["Base", "id, owner_user_id", "name, odata_url"],
+          [
+            "ODataCredential",
+            "base_id",
+            "login/password encrypted; только owner",
+          ],
+          ["BaseAccess", "base_id + phone", "ACL"],
+          ["Session", "user", "initData → токен"],
+        ]}
+      />
 
       <Divider />
 
@@ -305,16 +236,12 @@ export default function Telegram1cMiniappArchitecture() {
         <H3>MVP</H3>
         <Row gap={8} style={{ flexWrap: "wrap" }}>
           <Pill tone="info">Бот: телефон</Pill>
-          <Pill tone="info">Mini App: добавить базу</Pill>
-          <Pill tone="info">OData 1× / re-auth</Pill>
+          <Pill tone="info">База + OData</Pill>
+          <Pill tone="info">ACL телефоны</Pill>
           <Pill tone="info">Фонды</Pill>
         </Row>
-        <Text size="small" tone="secondary">
-          Админки для реестра нет: пользователь сам добавляет базы и учётки в Mini
-          App. На каждую базу — свои credentials.
-        </Text>
         <Text size="small" tone="tertiary" style={mergeStyle({ marginTop: 4 })}>
-          Источник: ответы по архитектуре · все решения закрыты
+          Обновлено: ACL + единый логин + melnichuk.kz
         </Text>
       </Stack>
     </Stack>
